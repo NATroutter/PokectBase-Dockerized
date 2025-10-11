@@ -24,5 +24,10 @@ jobs:
           echo ${{ secrets.PAT }} | docker login ${{ env.REGISTRY }} -u natroutter --password-stdin
       - name: Build
         run: |
-          docker build -t ${{ env.REGISTRY }}/${{ env.IMAGE }} --build-arg PB_VERSION=${{ env.VERSION }} .
+          docker build -t ${{ env.REGISTRY }}/${{ env.IMAGE }} \
+            --build-arg PB_VERSION=${{ env.VERSION }} \
+            --label "org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
+            --label "org.opencontainers.image.description=PocketBase Docker Image" \
+            --label "org.opencontainers.image.licenses=MIT" \
+            .
           docker push ${{ env.REGISTRY }}/${{ env.IMAGE }}
