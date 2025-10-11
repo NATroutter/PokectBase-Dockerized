@@ -1,0 +1,25 @@
+name: publish
+
+on:
+  push:
+    branches: [ "master" ]
+
+env:
+  REGISTRY: ghcr.io
+  USERNAME: natroutter
+  IMAGE: ${{ env.USERNAME }}/pocketbase:latest
+  VERSION: 0.29.3
+
+jobs:
+  publish:
+    name: publish image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Login
+        run: |
+          echo ${{ secrets.PAT }} | docker login ${{ env.REGISTRY }} -u natroutter --password-stdin
+      - name: Build
+        run: |
+          docker build -t ${{ env.REGISTRY }}/${{ env.IMAGE }} --build-arg PB_VERSION=${{ env.VERSION }} .
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE }}
