@@ -27,6 +27,8 @@ docker run -d \
   --name pocketbase \
   -p 8080:8080 \
   -v pocketbase_data:/pb/pb_data \
+  -e TZ=UTC \
+  -e PB_ENCRYPTION=your-32-character-encryption-key \
   ghcr.io/NATroutter/pocketbase:latest
 ```
 
