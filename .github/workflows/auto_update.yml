@@ -76,16 +76,12 @@ jobs:
 
       - name: Create GitHub Release
         if: steps.check.outputs.exists == 'false'
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: softprops/action-gh-release@v1
         with:
           tag_name: v${{ steps.upstream.outputs.version }}
-          release_name: PocketBase v${{ steps.upstream.outputs.version }}
+          name: PocketBase v${{ steps.upstream.outputs.version }}
           body: |
             ## Docker Image for PocketBase v${{ steps.upstream.outputs.version }}
-
-            This release provides a Docker image for PocketBase v${{ steps.upstream.outputs.version }}.
 
             ### Usage
             ```bash
@@ -95,25 +91,8 @@ jobs:
             ```
 
             ### Upstream Release
-            See the official PocketBase release notes: https://github.com/pocketbase/pocketbase/releases/tag/v${{ steps.upstream.outputs.version }}
-
-            ### Image Details
-            - **Registry:** `${{ env.REGISTRY }}`
-            - **Image:** `${{ env.IMAGE }}`
-            - **Version:** `${{ steps.upstream.outputs.version }}`
+            https://github.com/pocketbase/pocketbase/releases/tag/v${{ steps.upstream.outputs.version }}
           draft: false
           prerelease: false
-
-      - name: Build Summary
-        run: |
-          if [ "${{ steps.check.outputs.exists }}" == "true" ]; then
-            echo "### ✅ No Action Needed" >> $GITHUB_STEP_SUMMARY
-            echo "Version ${{ steps.upstream.outputs.version }} already exists" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "### 🚀 New Version Built" >> $GITHUB_STEP_SUMMARY
-            echo "Successfully built and published version ${{ steps.upstream.outputs.version }}" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "**Image Tags:**" >> $GITHUB_STEP_SUMMARY
-            echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ steps.upstream.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
-            echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE }}:latest\`" >> $GITHUB_STEP_SUMMARY
-          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
