@@ -25,17 +25,29 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Determine version
+      - name: Determine version and latest status
         id: version
         run: |
+          LATEST_VERSION=$(curl -s https://api.github.com/repos/pocketbase/pocketbase/releases/latest | jq -r .tag_name | sed 's/^v//')
+
           if [ -n "${{ github.event.inputs.version }}" ]; then
             VERSION="${{ github.event.inputs.version }}"
             echo "Using specified version: $VERSION"
           else
-            VERSION=$(curl -s https://api.github.com/repos/pocketbase/pocketbase/releases/latest | jq -r .tag_name | sed 's/^v//')
+            VERSION="$LATEST_VERSION"
             echo "Using latest upstream version: $VERSION"
           fi
+
           echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Latest upstream version: $LATEST_VERSION"
+
+          if [ "$VERSION" == "$LATEST_VERSION" ]; then
+            echo "is_latest=true" >> $GITHUB_OUTPUT
+            echo "✓ This IS the latest version - will update 'latest' tag"
+          else
+            echo "is_latest=false" >> $GITHUB_OUTPUT
+            echo "✗ This is NOT the latest version - will skip 'latest' tag"
+          fi
 
       - name: Login to registry
         run: |
@@ -52,5 +64,14 @@ jobs:
             --label "org.opencontainers.image.version=${{ steps.version.outputs.version }}" \
             .
 
+      - name: Push Docker images
+        run: |
           echo "Pushing version-specific tag..."
           docker push ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ steps.version.outputs.version }}
+
+          if [ "${{ steps.version.outputs.is_latest }}" == "true" ]; then
+            echo "Pushing latest tag..."
+            docker push ${{ env.REGISTRY }}/${{ env.IMAGE }}:latest
+          else
+            echo "Skipping latest tag (this is not the latest version)"
+          fi
