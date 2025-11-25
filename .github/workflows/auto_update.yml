@@ -88,11 +88,11 @@ jobs:
             This release provides a Docker image for PocketBase v${{ steps.upstream.outputs.version }}.
 
             ### Usage
-```bash
+            ```bash
             docker pull ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ steps.upstream.outputs.version }}
             # or
             docker pull ${{ env.REGISTRY }}/${{ env.IMAGE }}:latest
-```
+            ```
 
             ### Upstream Release
             See the official PocketBase release notes: https://github.com/pocketbase/pocketbase/releases/tag/v${{ steps.upstream.outputs.version }}
