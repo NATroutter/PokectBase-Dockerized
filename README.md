@@ -16,8 +16,6 @@ This repository provides a Docker image for [PocketBase](https://pocketbase.io/)
 - No warranty or guarantees provided
 - Always backup your data regularly
 
-For production use, consider the [official PocketBase installation methods](https://pocketbase.io/docs/).
-
 ## Quick Start
 
 ### Using Docker Run
@@ -32,21 +30,30 @@ docker run -d \
   ghcr.io/NATroutter/pocketbase:latest
 ```
 
-### Using Docker Compose
+### Using Docker Compose (Recomended)
 
 ```yaml
 services:
   pocketbase:
-    image: ghcr.io/NATroutter/pocketbase:latest
-    container_name: pocketbase
+    image: ghcr.io/natroutter/pocketbase:latest
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      - 127.0.0.1:8500:8080 #For production when using reverse proxy
+      #- 8500:8080 # For local testing
     volumes:
       - ./data:/pb_data
+      - ./migrations:/pb_migrations
+      - ./public:/pb_public
+      - ./hooks:/pb_hooks
     environment:
       - PB_ENCRYPTION=your-32-character-encryption-key
       - TZ=UTC
+    healthcheck:
+      test: wget --no-verbose --tries=1 --spider http://localhost:8080/api/health ||
+        exit 1
+      interval: 5s
+      timeout: 5s
+      retries: 5
 ```
 
 Then run:
@@ -58,8 +65,8 @@ docker-compose up -d
 ## Accessing PocketBase
 
 Once the container is running, you can access:
-- Admin UI: http://localhost:8080/_/
-- API: http://localhost:8080/api/
+- Admin UI: http://localhost:8500/_/
+- API: http://localhost:8500/api/
 
 ## Volumes
 
@@ -104,8 +111,8 @@ docker build -t pocketbase:local .
 To update to the latest version:
 
 ```bash
-docker pull ghcr.io/NATroutter/pocketbase:latest
 docker-compose down
+docker pull ghcr.io/NATroutter/pocketbase:latest
 docker-compose up -d
 ```
 
@@ -127,7 +134,7 @@ Or if using docker-compose with local volume:
 docker-compose down
 
 # Backup the data directory
-tar -czf pb_data_backup_$(date +%Y%m%d).tar.gz ./pb_data
+tar -czf pb_data_backup_$(date +%Y%m%d).tar.gz ./data
 
 # Restart the container
 docker-compose up -d
