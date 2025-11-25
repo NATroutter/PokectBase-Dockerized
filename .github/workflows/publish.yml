@@ -54,6 +54,3 @@ jobs:
 
           echo "Pushing version-specific tag..."
           docker push ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ steps.version.outputs.version }}
-
-          echo "Pushing latest tag..."
-          docker push ${{ env.REGISTRY }}/${{ env.IMAGE }}:latest
