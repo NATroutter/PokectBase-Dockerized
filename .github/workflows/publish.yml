@@ -57,16 +57,3 @@ jobs:
 
           echo "Pushing latest tag..."
           docker push ${{ env.REGISTRY }}/${{ env.IMAGE }}:latest
-
-      - name: Build Summary
-        run: |
-          echo "### 🔨 Manual Build Complete" >> $GITHUB_STEP_SUMMARY
-          if [ "${{ github.event_name }}" == "push" ]; then
-            echo "Triggered by push to master branch" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "Triggered manually via workflow dispatch" >> $GITHUB_STEP_SUMMARY
-          fi
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Image Tags:**" >> $GITHUB_STEP_SUMMARY
-          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ steps.version.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE }}:latest\`" >> $GITHUB_STEP_SUMMARY
