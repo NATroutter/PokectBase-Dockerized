@@ -1,0 +1,119 @@
+name: Auto Update
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # Daily check at midnight UTC
+  workflow_dispatch:  # Allow manual trigger
+
+env:
+  REGISTRY: ghcr.io
+  USERNAME: natroutter
+  IMAGE: natroutter/pocketbase
+
+jobs:
+  check-and-build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Get upstream version
+        id: upstream
+        run: |
+          VERSION=$(curl -s https://api.github.com/repos/pocketbase/pocketbase/releases/latest | jq -r .tag_name | sed 's/^v//')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Upstream version: $VERSION"
+
+      - name: Login to registry
+        run: |
+          echo ${{ secrets.PAT }} | docker login ${{ env.REGISTRY }} -u ${{ env.USERNAME }} --password-stdin
+
+      - name: Check if version already exists
+        id: check
+        run: |
+          # Try to pull the manifest for this version
+          if docker manifest inspect ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ steps.upstream.outputs.version }} > /dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "Version ${{ steps.upstream.outputs.version }} already exists, skipping build!"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "Version ${{ steps.upstream.outputs.version }} does not exist, starting new build!"
+          fi
+
+      - name: Build and Push Docker image
+        if: steps.check.outputs.exists == 'false'
+        run: |
+          docker build -t ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ steps.upstream.outputs.version }} \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE }}:latest \
+            --build-arg PB_VERSION=${{ steps.upstream.outputs.version }} \
+            --label "org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
+            --label "org.opencontainers.image.description=PocketBase Docker Image" \
+            --label "org.opencontainers.image.licenses=MIT" \
+            --label "org.opencontainers.image.version=${{ steps.upstream.outputs.version }}" \
+            .
+
+          echo "Pushing version-specific tag..."
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ steps.upstream.outputs.version }}
+
+          echo "Pushing latest tag..."
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE }}:latest
+
+      - name: Create Git tag
+        if: steps.check.outputs.exists == 'false'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Check if tag already exists
+          if git rev-parse "v${{ steps.upstream.outputs.version }}" >/dev/null 2>&1; then
+            echo "Tag v${{ steps.upstream.outputs.version }} already exists"
+          else
+            git tag -a "v${{ steps.upstream.outputs.version }}" -m "Release v${{ steps.upstream.outputs.version }}"
+            git push origin "v${{ steps.upstream.outputs.version }}"
+          fi
+
+      - name: Create GitHub Release
+        if: steps.check.outputs.exists == 'false'
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ steps.upstream.outputs.version }}
+          release_name: PocketBase v${{ steps.upstream.outputs.version }}
+          body: |
+            ## Docker Image for PocketBase v${{ steps.upstream.outputs.version }}
+
+            This release provides a Docker image for PocketBase v${{ steps.upstream.outputs.version }}.
+
+            ### Usage
+```bash
+            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ steps.upstream.outputs.version }}
+            # or
+            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE }}:latest
+```
+
+            ### Upstream Release
+            See the official PocketBase release notes: https://github.com/pocketbase/pocketbase/releases/tag/v${{ steps.upstream.outputs.version }}
+
+            ### Image Details
+            - **Registry:** `${{ env.REGISTRY }}`
+            - **Image:** `${{ env.IMAGE }}`
+            - **Version:** `${{ steps.upstream.outputs.version }}`
+          draft: false
+          prerelease: false
+
+      - name: Build Summary
+        run: |
+          if [ "${{ steps.check.outputs.exists }}" == "true" ]; then
+            echo "### ✅ No Action Needed" >> $GITHUB_STEP_SUMMARY
+            echo "Version ${{ steps.upstream.outputs.version }} already exists" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### 🚀 New Version Built" >> $GITHUB_STEP_SUMMARY
+            echo "Successfully built and published version ${{ steps.upstream.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Image Tags:**" >> $GITHUB_STEP_SUMMARY
+            echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ steps.upstream.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+            echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE }}:latest\`" >> $GITHUB_STEP_SUMMARY
+          fi

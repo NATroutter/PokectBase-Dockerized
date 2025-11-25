@@ -1,0 +1,72 @@
+name: Manual Publish
+
+on:
+  push:
+    branches: [ "master" ]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'PocketBase version to build (leave empty for latest upstream)'
+        required: false
+        type: string
+
+env:
+  REGISTRY: ghcr.io
+  USERNAME: natroutter
+  IMAGE: natroutter/pocketbase
+
+jobs:
+  publish:
+    name: Manual Build and Push
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Determine version
+        id: version
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+            echo "Using specified version: $VERSION"
+          else
+            VERSION=$(curl -s https://api.github.com/repos/pocketbase/pocketbase/releases/latest | jq -r .tag_name | sed 's/^v//')
+            echo "Using latest upstream version: $VERSION"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Login to registry
+        run: |
+          echo ${{ secrets.PAT }} | docker login ${{ env.REGISTRY }} -u ${{ env.USERNAME }} --password-stdin
+
+      - name: Build and Push Docker image
+        run: |
+          docker build -t ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ steps.version.outputs.version }} \
+            -t ${{ env.REGISTRY }}/${{ env.IMAGE }}:latest \
+            --build-arg PB_VERSION=${{ steps.version.outputs.version }} \
+            --label "org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
+            --label "org.opencontainers.image.description=PocketBase Docker Image" \
+            --label "org.opencontainers.image.licenses=MIT" \
+            --label "org.opencontainers.image.version=${{ steps.version.outputs.version }}" \
+            .
+
+          echo "Pushing version-specific tag..."
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ steps.version.outputs.version }}
+
+          echo "Pushing latest tag..."
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE }}:latest
+
+      - name: Build Summary
+        run: |
+          echo "### 🔨 Manual Build Complete" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ github.event_name }}" == "push" ]; then
+            echo "Triggered by push to master branch" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "Triggered manually via workflow dispatch" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Image Tags:**" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ steps.version.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ env.REGISTRY }}/${{ env.IMAGE }}:latest\`" >> $GITHUB_STEP_SUMMARY
